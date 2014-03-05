@@ -18,8 +18,9 @@ public class ThrottleControlKeepAlive extends CMessage {
 
 	boolean servoOpen;
 	
-	public ThrottleControlKeepAlive(Date timeStamp, byte[] payload) throws IOException {
-		super(timeStamp, payload);
+	public ThrottleControlKeepAlive(Date timeStamp, int messageId, byte[] payload) throws IOException {
+		
+		super(timeStamp, messageId,  payload);
 		
 		servoOpen = payloadStream.readBoolean();
 	}

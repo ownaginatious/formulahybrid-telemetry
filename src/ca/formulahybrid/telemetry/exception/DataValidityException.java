@@ -2,6 +2,8 @@ package ca.formulahybrid.telemetry.exception;
 
 public class DataValidityException extends DataException {
 
+	private static final long serialVersionUID = -7354785417380955128L;
+	
 	private int code;
 	
 	public DataValidityException(int code, String message, Exception e){

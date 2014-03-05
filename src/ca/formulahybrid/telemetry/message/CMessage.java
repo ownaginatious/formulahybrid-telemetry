@@ -10,18 +10,23 @@ import java.util.Date;
 
 public abstract class CMessage {
 
+	// Identifier as "CAN Telemetry Network Message".
+	public static final byte[] protocolIdentifier = "CTNM".getBytes();
+	
 	private static SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
 	
 	protected Date timeStamp;
 	protected byte[] rawData;
 	protected int length;
+	protected int messageId;
 	protected short id;
 	protected MessageOrigin origin;
 	protected DataInputStream payloadStream;
 	
-	public CMessage(Date timeStamp, byte[] payload) throws IOException {
+	public CMessage(Date timeStamp, int messageId, byte[] payload) throws IOException {
 		
 		this.rawData = payload;
+		this.messageId = messageId;
 		this.timeStamp = timeStamp;
 		
 		MessageDescriptor md = this.getClass().getAnnotation(MessageDescriptor.class);
@@ -57,6 +62,11 @@ public abstract class CMessage {
 	public final Date getTimeStamp(){
 		
 		return timeStamp;
+	}
+	
+	public final int getMessageId(){
+	
+		return messageId;
 	}
 	
 	public String rawDataString(){

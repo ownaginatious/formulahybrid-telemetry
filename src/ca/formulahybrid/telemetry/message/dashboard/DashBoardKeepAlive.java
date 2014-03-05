@@ -23,9 +23,9 @@ public class DashBoardKeepAlive extends CMessage {
 	private boolean throttleEnabled;
 	private boolean combustionEngineActive;
 	
-	public DashBoardKeepAlive(Date timeStamp, byte[] payload) throws IOException {
+	public DashBoardKeepAlive(Date timeStamp, int messageId, byte[] payload) throws IOException {
 		
-		super(timeStamp, payload);
+		super(timeStamp, messageId,  payload);
 		
 		byte status = payloadStream.readByte();
 		

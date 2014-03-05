@@ -19,9 +19,9 @@ public class DashBoardGearShift extends CMessage {
 
 	private boolean shiftUp = false;
 	
-	public DashBoardGearShift(Date timeStamp, byte[] payload) throws IOException {
+	public DashBoardGearShift(Date timeStamp, int messageId, byte[] payload) throws IOException {
 		
-		super(timeStamp, payload);
+		super(timeStamp, messageId,  payload);
 		
 		if(payloadStream.readBoolean())
 			shiftUp = true;

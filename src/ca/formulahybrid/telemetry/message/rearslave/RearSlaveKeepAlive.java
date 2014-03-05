@@ -25,9 +25,9 @@ public class RearSlaveKeepAlive extends CMessage {
 	private int backLeftWheelSpeed;
 	private int backRightWheelSpeed;
 	
-	public RearSlaveKeepAlive(Date timeStamp, byte[] payload) throws IOException {
+	public RearSlaveKeepAlive(Date timeStamp, int messageId, byte[] payload) throws IOException {
 		
-		super(timeStamp, payload);
+		super(timeStamp, messageId,  payload);
 		
 		engineStatus = payloadStream.readShort();
 		

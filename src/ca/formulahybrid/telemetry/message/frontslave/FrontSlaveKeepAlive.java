@@ -25,9 +25,9 @@ public class FrontSlaveKeepAlive extends CMessage {
 	
 	byte checksum;
 	
-	public FrontSlaveKeepAlive(Date timestamp, byte[] payload) throws IOException {
+	public FrontSlaveKeepAlive(Date timeStamp, int messageId, byte[] payload) throws IOException {
 		
-		super(timestamp, payload);
+		super(timeStamp, messageId,  payload);
 		
 		frontLeftWheelSpeed = payloadStream.readByte();
 		frontRightWheelSpeed = payloadStream.readByte();

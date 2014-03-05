@@ -1,5 +1,6 @@
 package ca.formulahybrid.telemetry.message;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -17,10 +18,10 @@ import ca.formulahybrid.telemetry.exception.DataException;
 
 public class CMessageFactory {
 	
-	private Map<Short, Constructor<? extends CMessage>> idMap = new HashMap<Short, Constructor<? extends CMessage>>();
-	private Map<Short, Integer> sizeMap = new HashMap<Short, Integer>();
+	private static Map<Short, Constructor<? extends CMessage>> idMap = new HashMap<Short, Constructor<? extends CMessage>>();
+	private static Map<Short, Integer> sizeMap = new HashMap<Short, Integer>();
 	
-	public CMessageFactory() throws DataException {
+	static {
 		
 		// Find all the classes extending CMessage.
 		Reflections reflections = new Reflections("ca.formulahybrid.telemetry.message");
@@ -41,11 +42,15 @@ public class CMessageFactory {
 				
 			} catch (SecurityException e) { // Only accessing public constructors.
 			} catch (NoSuchMethodException e) {} // Enforced by extension.
-			
+			catch (DataException e) {
+				
+				e.printStackTrace();
+				System.exit(1);
+			}
 		}
 	}
 	
-	private void putWithCheck(short id, int length, Constructor<? extends CMessage> constructor) throws DataException {
+	private static void putWithCheck(short id, int length, Constructor<? extends CMessage> constructor) throws DataException {
 		
 		if(idMap.containsKey(idMap))
 			throw new DataException("Attempted to insert duplicate id [" + id + "] for " 
@@ -56,19 +61,29 @@ public class CMessageFactory {
 		
 	}
 	
-	public CMessage buildMessage(InputStream is) throws IOException, DataException{
+	public static CMessage parseMessage(byte[] b) throws IOException, DataException {
+	
+		return buildMessage(new ByteArrayInputStream(b));
+	}
+	
+	public static CMessage buildMessage(InputStream is) throws IOException, DataException{
 		
 		// Convert to a data stream.
 		DataInputStream dis = new DataInputStream(is);
+		
+		byte[] header = new byte[4];
+		
+		if(!header.equals(CMessage.protocolIdentifier))
+			return null;
 		
 		// Read in the date.
 		int unixTime = dis.readInt();
 		
 		Date date = new Date();
 		date.setTime(unixTime * 1000);
-				
-		//TODO: Find exact message ID length.
-		short messageId = dis.readShort();
+		
+		int messageId = dis.readInt();
+		short messageOrigin = dis.readShort();
 		
 		// Build the message.
 		if(!idMap.containsKey(messageId))
@@ -87,7 +102,7 @@ public class CMessageFactory {
 		try {
 			
 			// Build a new instance of the message.
-			return messageConstructor.newInstance(date, is);
+			return messageConstructor.newInstance(date, messageId, is);
 			
 		} catch (IllegalArgumentException e) { // Impossible given already checked restrictions.
 		} catch (InstantiationException e) {
