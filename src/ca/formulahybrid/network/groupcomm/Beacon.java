@@ -17,7 +17,7 @@ public abstract class Beacon {
 	
 	protected InetAddress origin;
 	protected UUID identifier;
-	protected float pingSpeed;
+	protected float pingTime;
 	protected State state;
 	
 	public InetAddress getOrigin(){
@@ -30,9 +30,9 @@ public abstract class Beacon {
 		return identifier;
 	}
 
-	public double getPingSpeed() {
+	public float getPingTime() {
 
-		return pingSpeed;
+		return pingTime;
 	}
 
 	public State getState() {

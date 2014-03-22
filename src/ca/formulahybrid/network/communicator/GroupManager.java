@@ -1,237 +1,214 @@
 package ca.formulahybrid.network.communicator;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.locks.Lock;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+
+import org.apache.log4j.Logger;
 
 import ca.formulahybrid.network.groupcomm.Beacon;
 import ca.formulahybrid.network.groupcomm.GroupCommunicator;
-import ca.formulahybrid.network.groupcomm.GroupCommunicator.Channel;
-import ca.formulahybrid.network.groupcomm.BeaconFactory;
 import ca.formulahybrid.network.groupcomm.ListenerBeacon;
+import ca.formulahybrid.network.groupcomm.Origin;
 import ca.formulahybrid.network.groupcomm.RelayBeacon;
 import ca.formulahybrid.network.groupcomm.State;
+import ca.formulahybrid.network.receiver.TelemetryReceiver;
+import ca.formulahybrid.network.receiver.TelemetryReceiverConnection;
+import ca.formulahybrid.telemetry.connector.TelemetryConnection;
 import ca.formulahybrid.telemetry.connector.TelemetrySource;
-import ca.formulahybrid.telemetry.exception.BeaconException;
-import ca.formulahybrid.telemetry.message.CMessage;
 
 public class GroupManager {
 
-    private GroupCommunicator groupComm;
+    // -------------------
+    // Behaviour constants
+    // -------------------
+    private static final float GROUPLOSS_THRESHOLD = (float) 1.2;
+    private static final float GROUPLOSS_THRESHOLD_HYSTERESIS = (float) 0.1;
 
-    private Set<TelemetrySource> sources = new HashSet<TelemetrySource>();
+    private static final float SELFLOSS_THRESHOLD = (float) 1.2;
+    private static final float SELFLOSS_THRESHOLD_HYSTERESIS = (float) 0.1;
 
-    private Map<UUID, Beacon> neighbours = new HashMap<UUID, Beacon>();
-    private BlockingQueue<Beacon> incomingBeacons = new LinkedBlockingQueue<Beacon>();
+    // -------------------
     
-    private float pingTime = -1;
-    private byte lossRate;
-    private boolean sourceReacheable = false;
-
-    private static Pattern unixPingTimePattern = Pattern.compile(".+ time=(?<time>[0-9.]+) ms$");
-    private static Pattern windowsPingTimePattern = Pattern.compile(".+ Average = (?<time>[0-9.]+)ms$");
-
-    private Object pingUpdateLock = new Object();
-    private Object sourceUpdateLock = new Object();
+    private static Logger logger = Logger.getLogger(GroupManager.class);
     
-    private boolean tryPing = true;
-    private State s;
+    private Set<TelemetrySource> relays = new HashSet<TelemetrySource>();
     
-    private InetAddress presentRelay;
+    private GroupCommunicator gc = new GroupCommunicator();
+
+    // --------------------
+    // Group member data.
+    // --------------------
     
     private UUID identifier;
+    private State state;
     
-    public GroupManager() throws IOException {
-        
-        // Generate a unique ID for this device. The chances of a randomly generated clash
-        // in a listener network is basically zero.
-        this.identifier = UUID.randomUUID();
-        
-        //#FIXME Commenting out for commit.
-       // new Thread(this).start();
-    }
-
-    public Set<TelemetrySource> discoverRelay() throws IOException {
-        
-        return null;
-    }
-
-    private void sendBeaconRoutine(){
-
-        Channel currentChannel = this.groupComm.getChannel();
-        
-        // We only want to send beacons while listening or relaying.
-        if(currentChannel == Channel.DISCONNECTED | currentChannel == Channel.DISCOVER)
-            return;
-        
-        Beacon b = null;
-
-        //#FIXME Commenting out to maintain compilation for commit.
-        /*
-        if(currentChannel = Channel.RELAY){
-            
-            b = new RelayBeacon(UUID );
-        } else*/
-    }
-
-    private void processBeaconsRoutine(){
-
-        Beacon b = null;
-
-        // Process all incoming beacons into the neighbours map.
-        while((b = this.incomingBeacons.poll()) != null){
-
-            UUID identifier = b.getIdentifier();
-
-            // We want to maintain stability if another node with the same UUID shows up.
-            // We will only listen to the one that appeared first.
-            if(this.neighbours.keySet().contains(identifier)){
-                if(this.neighbours.get(identifier).getOrigin().equals(b.getOrigin()))
-                    this.neighbours.put(identifier, b);
-            } else
-                this.neighbours.put(identifier, b);
-        }
-        
-        // Determine what information should be analyzed based on the current channel.
-        switch(this.groupComm.getChannel()){
-        
-            case DISCOVER:
-                
-                // Here we only want to analyze only relay beacons.
-                
-                for(UUID node : this.neighbours.keySet()){
-                    
-                    Beacon neighbour = this.neighbours.get(node);
-                    
-                    if(neighbour instanceof RelayBeacon){
-                        
-                        String sourceName = ((RelayBeacon) neighbour).getSourceName();
-                        InetAddress sourceAddress = ((RelayBeacon) neighbour).getSourceAddress();
-                    }
-                }
-                break;
-                
-            case LISTEN:
-                
-                break;
-                
-            case RELAY:
-                
-                break;
-                
-        default:
-            break;
-        }
-    }
-
-    private void updateDistanceVectorRoutine(){
-
-        Pattern pingTimePattern = null;
-
-        if(!tryPing)
-            return;
-        
-        try {
-            
-            String cmd = "ping";
-
-            if(System.getProperty("os.name").startsWith("Windows")) {
-
-                // For Windows.
-                cmd += " -n 10 " + presentRelay.getHostAddress();
-                pingTimePattern = windowsPingTimePattern;
-
-            } else {
-                
-                // For Linux, BSD and Mac OS X.
-                cmd += " -c 10 " + presentRelay.getHostAddress();
-                pingTimePattern = unixPingTimePattern;
-            }
-
-            Process myProcess = Runtime.getRuntime().exec(cmd);
-
-            if(myProcess.waitFor() != 0){
-                
-                synchronized(pingUpdateLock) {
-                    
-                    this.tryPing = false;
-                }
-                
-                return;
-            }
-
-            BufferedReader br = new BufferedReader(new InputStreamReader(myProcess.getInputStream()));
-
-            String line = null, tempLine;
-
-            // Skip to the end of the output.
-            while ((tempLine = br.readLine()) != null)
-                line = tempLine;
-           
-            Matcher m = pingTimePattern.matcher(line);
-
-            synchronized(pingUpdateLock){
-                
-                if(m.find()){
+    private boolean sourceReacheable = false;
+    private float pingTime;
+    private float lossRate;
     
-                    this.pingTime = Float.parseFloat(m.group("time"));
-                    this.tryPing = true;
-                }
-                else
-                    this.tryPing = false;
-            }
-        } catch (IOException | InterruptedException | NumberFormatException e) {
+    private boolean relayable;
+    
+    private TelemetryReceiver trc;
+    
+    // Timeouts
+    private int groupLossTimeOut = 0;
+    private int selfLossTimeOut = 0;
+    private int takeOverTimeout = 0;
+    
+    // --------------------
+
+    // ------------------
+    // Other member data
+    // ------------------
+    
+    protected Map<UUID, Beacon> neighbours = new HashMap<UUID, Beacon>();
+    protected Map<UUID, Integer> neighbourTimeouts = new HashMap<UUID, Integer>();
+
+    // ------------------
+
+    public void processBeacons(){
+        
+        int udpListenerCount = 0, nodesWithReachCount = 0, pingRank = 0;
+        float averageLoss = 0, bestPingTime = this.pingTime;
+        
+        // Increase the age of each neighbour's last communication.
+        for(UUID neighbour : this.neighbourTimeouts.keySet()){
             
-            e.printStackTrace();
+            int age = this.neighbourTimeouts.get(neighbour) + 1;
+            this.neighbourTimeouts.put(neighbour, age);
+        }
+        
+        Beacon b;
+
+        // Store and reset timeouts for all incoming beacons.
+        while((b = gc.getBeacon()) != null){
+
+            // We do not want to store our own beacon.
+            if(this.identifier.equals(b.getIdentifier()))
+                continue;
+            
+            this.neighbours.put(b.getIdentifier(), b);
+            this.neighbourTimeouts.put(b.getIdentifier(), 0); // Cancel out any timeout for this node.
+        }
+        
+        // Remove all beacons who have timed out.
+        for(UUID bId : this.neighbourTimeouts.keySet()){
+            
+            // Remove any beacons that have disappeared for more than 3 beacon processing cycles (9 seconds).
+            if(this.neighbourTimeouts.get(bId) > 3)
+                this.neighbours.remove(bId);
+        }
+        
+        // Recalculate all node statistics.
+        for(UUID bId : this.neighbours.keySet()){
+            
+            Beacon neighbour = this.neighbours.get(bId);
+            
+            boolean canReachSource = false;
+            
+            if(neighbour instanceof RelayBeacon)
+                canReachSource = true; // Relays can always reach the source.
+            
+            else {
+                
+                ListenerBeacon lb = (ListenerBeacon) neighbour;
+                canReachSource = lb.sourceReacheable();
+                
+                // All listeners on UDP express a loss rate.
+                if(lb.getState() == State.LISTENINGUDP){
+                    
+                    averageLoss += lb.getLossRate();
+                    udpListenerCount++;
+                }
+            }
+            
+            if(canReachSource){
+                
+                nodesWithReachCount++;
+                
+                float neighbourPing = neighbour.getPingTime();
+                
+                // If this node's source ping time is better than that of the neighbour being processed,
+                // then increase this node's rank by 1.
+                pingRank += (this.pingTime <= neighbourPing) ? 1 : 0;
+                bestPingTime = (neighbourPing > bestPingTime)? neighbourPing : bestPingTime;
+            }
+        }
+        
+        // Calculate the loss factor of this node.
+        // Over the interval [-1 ... 1 ]; 0 is average, positive is higher loss rate and -1 is
+        // lower than the average.
+        averageLoss = ((float) averageLoss + this.lossRate)/ (float) (udpListenerCount + 1);
+        float selfToGroupLossRatio = this.lossRate / averageLoss - 1;
+        
+        // Increase timeouts for self loss.
+        if(selfToGroupLossRatio > SELFLOSS_THRESHOLD)
+            this.selfLossTimeOut++;
+        else if(selfToGroupLossRatio < (SELFLOSS_THRESHOLD - SELFLOSS_THRESHOLD_HYSTERESIS))
+            this.selfLossTimeOut = (this.selfLossTimeOut == 0) ? 0 : this.selfLossTimeOut - 1;
+        
+        // Increase timeouts for group loss.
+        if(averageLoss > GROUPLOSS_THRESHOLD)
+            this.groupLossTimeOut++;
+        else if(averageLoss < (GROUPLOSS_THRESHOLD - GROUPLOSS_THRESHOLD_HYSTERESIS))
+            this.groupLossTimeOut = (this.groupLossTimeOut == 0) ? 0 : this.groupLossTimeOut - 1;
+        
+        // If this node is in the top 20% of source ping times, then it should try to become
+        // the relay, given the opportunity.
+        relayable = (0.8 * nodesWithReachCount) <= pingRank;
+        
+        // The purpose of this value is to help reduce the number of nodes that attempt to become a relay
+        // to reduce stress on the source.
+        //
+        // If this node's ping is at least 50 milliseconds better than the best and better by a factor
+        // of more than 5, then this node is considerably better than the one supplying it. If this
+        // node's ping time is the best ping time, then obviously this node is significantly better.
+        // This gets ignored when the node is acting as a relay.
+        boolean significantlyBetterPing = (Math.abs(this.pingTime - bestPingTime) > 50)
+                                                & (this.pingTime / bestPingTime > 5)
+                                                | this.pingTime == bestPingTime;
+        
+        if(significantlyBetterPing)
+            this.takeOverTimeout++;
+        else
+            this.takeOverTimeout--;
+            
+        // Perform the appropriate behaviour routine depending on the state of this node.
+        if(this.state == null){
+            
+        }
+        else if(this.state.origin == Origin.RELAY){
+            
+            
+        } else if(this.state.origin == Origin.LISTENER) {
+            
         }
     }
-
-    private void beaconReceiveThreadMethodRoutine() {
-
-        // This thread is the "listening" component of the group manager, setting
-        // flags appropriately.
-        try {
-
-            // Create a new communicator for this group.
-            this.groupComm = new GroupCommunicator();
-            this.groupComm.switchToDiscoveryChannel();
-            
-            //TODO: Implement kill flagging.
-            while(true){
-
-                Beacon b = null;
-                
-                try {
-                    
-                    b = this.groupComm.receiveBeacon();
-                    
-                } catch (BeaconException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-                
-                incomingBeacons.add(b);
-            }
-
-            // Add the beacon to the incoming queue.
-        } catch (IOException e) {
-            
-            e.printStackTrace();
-        }
+    
+    private void performAsDiscoverer(){
+        
+        
+    }
+    
+    private void performAsRelay(float groupLoss, int pingRank, boolean significantlyBetterPing){
+        
+        
+    }
+    
+    private void performAsListener(){
+        
+        
+    }
+    
+    private void initiateTakeOver(){
+        
+        
+    }
+    
+    private void transformToListener(){
+        
     }
 }

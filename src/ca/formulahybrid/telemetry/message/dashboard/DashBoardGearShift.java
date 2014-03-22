@@ -4,7 +4,7 @@ import java.io.IOException;
 
 import java.util.Date;
 
-import ca.formulahybrid.telemetry.message.CMessage;
+import ca.formulahybrid.telemetry.message.TelemetryMessage;
 import ca.formulahybrid.telemetry.message.MessageDescriptor;
 import ca.formulahybrid.telemetry.message.MessageOrigin;
 
@@ -15,7 +15,7 @@ import ca.formulahybrid.telemetry.message.MessageOrigin;
 	origin = MessageOrigin.DASHBOARD,
 	length = 1
 )
-public class DashBoardGearShift extends CMessage {
+public class DashBoardGearShift extends TelemetryMessage {
 
 	private boolean shiftUp = false;
 	

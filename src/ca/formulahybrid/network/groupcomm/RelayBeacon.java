@@ -16,14 +16,49 @@ import ca.formulahybrid.telemetry.exception.BeaconException;
 
 public class RelayBeacon extends Beacon {
 	
-    protected TelemetrySource telemetrySource;
-    protected String sourceName;
-	protected InetAddress sourceAddress;
-	protected InetAddress groupAddress;
-	protected UUID takeover;
-	protected int udpPort = -1;
-	protected int tcpPort = -1;
-	protected boolean requestHandover = false;
+    public final class NetworkTelemetrySource extends TelemetrySource {
+        
+        private int tcpPort = 0;
+        private int udpPort = 0;
+        
+        private InetAddress groupAddress = null;
+        
+        protected NetworkTelemetrySource(String name, InetAddress address) {
+            
+            super(name, address);
+        }
+        
+        public InetAddress getGroupAddress(){
+            
+            return this.groupAddress;
+        }
+        
+        public int getUdpPort(){
+            
+            return this.udpPort;
+        }
+        
+        public int getTcpPort(){
+            
+            return this.tcpPort;
+        }
+        
+        public boolean hasTcp(){
+            
+            return this.tcpPort > 0;
+        }
+        
+        public boolean hasUdp(){
+            
+            return this.udpPort > 0;
+        }
+    }
+    
+    private NetworkTelemetrySource telemetrySource;
+    private InetAddress groupAddress;
+	
+    private UUID takeover;
+    private boolean requestHandover = false;
 	
 	protected RelayBeacon(){}
 	
@@ -31,8 +66,9 @@ public class RelayBeacon extends Beacon {
 	    
 	    this.identifier = identifier;
 	    this.state = state;
-	    this.pingSpeed = pingSpeed;
-	    this.telemetrySource = ts;
+	    this.pingTime = pingSpeed;
+	    
+	    this.telemetrySource = new NetworkTelemetrySource(ts.getName(), ts.getSourceAddress());
 	}
 	
    public RelayBeacon setReliableChannel(int tcpPort) throws BeaconException{
@@ -41,24 +77,34 @@ public class RelayBeacon extends Beacon {
            throw new BeaconException("Attempted to set a TCP value of '"
                    + tcpPort + "'. Valid numbers are between 1 and 65535.");
        
-        this.tcpPort = tcpPort;
+        this.telemetrySource.tcpPort = tcpPort;
         
         return this;
     }
 	   
 	public RelayBeacon setBroadcasting(InetAddress groupAddress, int udpPort) throws BeaconException{
 	    
-	    if(tcpPort <= 0 | tcpPort > 65535 | udpPort <= 0 | udpPort > 65535)
-            throw new BeaconException("Attempted to set a UDP or TCP value out of range. Valid numbers are "
-                    + "between 1 and 65535.");
+	    if(udpPort <= 0 | udpPort > 65535)
+	           throw new BeaconException("Attempted to set a UDP value of '"
+	                   + udpPort + "'. Valid numbers are between 1 and 65535.");
 	    
-	    this.groupAddress = groupAddress;
-	    this.udpPort = udpPort;
+	    this.telemetrySource.groupAddress = groupAddress;
+	    this.telemetrySource.udpPort = udpPort;
 	    
 	    return this;
 	}
 	
-	public RelayBeacon requestHandOver(UUID takeover){
+	public InetAddress getGroupAddress(){
+	    
+	    return this.groupAddress;
+	}
+	
+	public NetworkTelemetrySource getTelemetrySource(){
+	
+	    return this.telemetrySource;
+	}
+	
+	public RelayBeacon requestTakeOver(UUID takeover){
 		
 		this.requestHandover = true;
 		this.takeover = takeover;
@@ -66,29 +112,14 @@ public class RelayBeacon extends Beacon {
 		return this;
 	}
 	
-	public String getSourceName(){
-	    
-	    return sourceName;
+	public boolean requestingTakeOver(){
+	
+	    return this.takeover != null;
 	}
 	
-   public InetAddress getSourceAddress(){
-        
-        return sourceAddress;
-    }
-	   
-	public InetAddress getGroupAddress() {
-		
-		return groupAddress;
-	}
-
 	public UUID getTakeover() {
 		
 		return takeover;
-	}
-
-	public int getTcpPort() {
-		
-		return tcpPort;
 	}
 
 	@Override
@@ -96,18 +127,15 @@ public class RelayBeacon extends Beacon {
 		
 		DataOutputStream dos = new DataOutputStream(os);
 		
-		byte[] name = this.sourceName.getBytes(Charsets.UTF_8);
+		byte[] name = this.telemetrySource.getName().getBytes(Charsets.UTF_8);
 		dos.write(name.length);
 		dos.write(name);
 		
-		dos.write(this.sourceAddress.getAddress());
+		dos.write(this.telemetrySource.getSourceAddress().getAddress());
 		dos.write(this.groupAddress.getAddress());
 		
-		if(this.state == State.UDPONLY || this.state == State.UDPANDTCP)
-			dos.writeShort((short) this.udpPort);
-		
-		if(this.state == State.TCPONLY || this.state == State.UDPANDTCP)
-			dos.writeShort((short) this.tcpPort);
+		dos.writeShort((short) this.telemetrySource.udpPort);
+		dos.writeShort((short) this.telemetrySource.tcpPort);
 		
 		if(this.requestHandover){
 			
@@ -129,27 +157,28 @@ public class RelayBeacon extends Beacon {
 		byte[] nameBuffer = new byte[nameLength];
 		
 		dis.read(nameBuffer);
-		this.sourceName = new String(nameBuffer, Charsets.UTF_8);
+		String sourceName = new String(nameBuffer, Charsets.UTF_8);
 		
 		byte[] addressBuffer = new byte[4];
 		
 		try {
 
 			dis.read(addressBuffer);
-			this.sourceAddress = InetAddress.getByAddress(addressBuffer);
-
+			InetAddress sourceAddress = InetAddress.getByAddress(addressBuffer);
+			
 			dis.read(addressBuffer);
-			this.groupAddress = InetAddress.getByAddress(addressBuffer);
+			
+            NetworkTelemetrySource nts = new NetworkTelemetrySource(sourceName, sourceAddress);
+            nts.groupAddress = InetAddress.getByAddress(addressBuffer);
+                    
+			nts.udpPort = (int) dis.readShort() & 0xFFFF;
+	        nts.tcpPort = (int) dis.readShort() & 0xFFFF;
+	        
+            this.telemetrySource = nts;
 			
 		} catch (UnknownHostException e) {
 			throw new BeaconException("Malformed source or group address detected from relay beacon.");
 		}
-		
-		if(this.state == State.UDPONLY || this.state == State.UDPANDTCP)
-			this.udpPort = (int) dis.readShort() & 0xFFFF;
-			
-		if(this.state == State.UDPONLY || this.state == State.UDPANDTCP)
-			this.tcpPort = (int) dis.readShort() & 0xFFFF;
 						
 		// If requesting hand over.
 		if(dis.readBoolean())

@@ -8,7 +8,7 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-public abstract class CMessage {
+public abstract class TelemetryMessage {
 
 	// Identifier as "CAN Telemetry Network Message".
 	public static final byte[] protocolIdentifier = "CTNM".getBytes();
@@ -23,11 +23,11 @@ public abstract class CMessage {
 	protected MessageOrigin origin;
 	protected DataInputStream payloadStream;
 	
-	public CMessage(Date timeStamp, int messageId, byte[] payload) throws IOException {
-		
-		this.rawData = payload;
+	public TelemetryMessage(Date timeStamp, int messageId, byte[] payload) throws IOException {
+
+        this.timeStamp = timeStamp;
 		this.messageId = messageId;
-		this.timeStamp = timeStamp;
+        this.rawData = payload;
 		
 		MessageDescriptor md = this.getClass().getAnnotation(MessageDescriptor.class);
 				

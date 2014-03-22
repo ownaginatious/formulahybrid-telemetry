@@ -3,7 +3,7 @@ package ca.formulahybrid.telemetry.message.frontslave;
 import java.io.IOException;
 import java.util.Date;
 
-import ca.formulahybrid.telemetry.message.CMessage;
+import ca.formulahybrid.telemetry.message.TelemetryMessage;
 import ca.formulahybrid.telemetry.message.MessageDescriptor;
 import ca.formulahybrid.telemetry.message.MessageOrigin;
 
@@ -13,7 +13,7 @@ import ca.formulahybrid.telemetry.message.MessageOrigin;
 	origin = MessageOrigin.FRONTSLAVE,
 	length = 0
 )
-public class FrontSlaveBrakeOverTravel extends CMessage {
+public class FrontSlaveBrakeOverTravel extends TelemetryMessage {
 
 	public FrontSlaveBrakeOverTravel(Date timeStamp, int messageId, byte[] payload) throws IOException {
 		

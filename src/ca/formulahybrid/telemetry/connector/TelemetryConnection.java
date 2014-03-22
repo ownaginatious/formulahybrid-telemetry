@@ -6,7 +6,7 @@ import java.util.Set;
 
 import ca.formulahybrid.telemetry.exception.ConnectException;
 import ca.formulahybrid.telemetry.exception.DataException;
-import ca.formulahybrid.telemetry.message.CMessage;
+import ca.formulahybrid.telemetry.message.TelemetryMessage;
 
 public class TelemetryConnection {
 
@@ -86,17 +86,17 @@ public class TelemetryConnection {
 		
 	}
 	
-	public CMessage getMessage() throws ConnectException{
+	public TelemetryMessage getMessage() throws ConnectException{
 		
 		return null;
 	}
 
-	public CMessage getMessage(long timeout) throws ConnectException{
+	public TelemetryMessage getMessage(long timeout) throws ConnectException{
 		
 		return null;
 	}
 
-	public CMessage sendMessage(CMessage cm) throws ConnectException{
+	public TelemetryMessage sendMessage(TelemetryMessage cm) throws ConnectException{
 		
 		return null;
 	}

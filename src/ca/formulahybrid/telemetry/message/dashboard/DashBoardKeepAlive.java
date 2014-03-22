@@ -3,7 +3,7 @@ package ca.formulahybrid.telemetry.message.dashboard;
 import java.io.IOException;
 import java.util.Date;
 
-import ca.formulahybrid.telemetry.message.CMessage;
+import ca.formulahybrid.telemetry.message.TelemetryMessage;
 import ca.formulahybrid.telemetry.message.MessageDescriptor;
 import ca.formulahybrid.telemetry.message.MessageOrigin;
 
@@ -14,7 +14,7 @@ import ca.formulahybrid.telemetry.message.MessageOrigin;
 	origin = MessageOrigin.DASHBOARD,
 	length = 1
 )
-public class DashBoardKeepAlive extends CMessage {
+public class DashBoardKeepAlive extends TelemetryMessage {
 
 	private boolean declutchInitialized;
 	private boolean dragReduceEnabled;

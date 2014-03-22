@@ -28,7 +28,7 @@ public final class BeaconFactory {
 	 * Reads a single beacon message from an input stream.
 	 * 
 	 * @param is The input stream the beacon is arriving from.
-	 * @return A beacon if that is the datagram type that arrived, and null otherwise.
+	 * @return An arrived beacon.
 	 * @throws BeaconException If the incoming data was detected as a beacon, but was malformed.
 	 */
 	public static Beacon readBeacon(InputStream is) throws BeaconException {
@@ -43,9 +43,9 @@ public final class BeaconFactory {
 			
 			is.read(header);
 
-			// The received message is probably not intended for this device; ignore it.
+			// The received message is probably not intended for this program.
 			if(!header.equals(Beacon.protocolIdentifier))
-				return null;
+                throw new BeaconException("Invalid beacon header; dropping message.");
 
 			// Read the client ID.
 			UUID uuid =  new UUID(dis.readLong(), dis.readLong());
@@ -62,7 +62,7 @@ public final class BeaconFactory {
 			}
 			
 			// True if a relay beacon, false otherwise.
-			if(s.getParent() == Origin.RELAY)
+			if(s.origin == Origin.RELAY)
 				b = new RelayBeacon();
 			else
 				b = new ListenerBeacon();
@@ -79,7 +79,7 @@ public final class BeaconFactory {
 			}
 			
 			if(sourceReacheable)
-			    b.pingSpeed = dis.readFloat();
+			    b.pingTime = dis.readFloat();
 			
 			b.populateFromStream(is);
 			

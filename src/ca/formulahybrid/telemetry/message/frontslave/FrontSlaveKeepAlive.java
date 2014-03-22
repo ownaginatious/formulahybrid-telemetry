@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.util.Date;
 
 import ca.formulahybrid.telemetry.exception.DataValidityException;
-import ca.formulahybrid.telemetry.message.CMessage;
+import ca.formulahybrid.telemetry.message.TelemetryMessage;
 import ca.formulahybrid.telemetry.message.MessageDescriptor;
 import ca.formulahybrid.telemetry.message.MessageOrigin;
 
@@ -15,7 +15,7 @@ import ca.formulahybrid.telemetry.message.MessageOrigin;
 	origin = MessageOrigin.FRONTSLAVE,
 	length = 6
 )
-public class FrontSlaveKeepAlive extends CMessage {
+public class FrontSlaveKeepAlive extends TelemetryMessage {
 
 	private int frontLeftWheelSpeed;
 	private int frontRightWheelSpeed;

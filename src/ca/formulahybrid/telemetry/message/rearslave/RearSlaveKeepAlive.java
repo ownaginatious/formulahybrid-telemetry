@@ -3,7 +3,7 @@ package ca.formulahybrid.telemetry.message.rearslave;
 import java.io.IOException;
 import java.util.Date;
 
-import ca.formulahybrid.telemetry.message.CMessage;
+import ca.formulahybrid.telemetry.message.TelemetryMessage;
 import ca.formulahybrid.telemetry.message.MessageDescriptor;
 import ca.formulahybrid.telemetry.message.MessageOrigin;
 
@@ -14,7 +14,7 @@ import ca.formulahybrid.telemetry.message.MessageOrigin;
 	origin = MessageOrigin.REARSLAVE,
 	length = 5
 )
-public class RearSlaveKeepAlive extends CMessage {
+public class RearSlaveKeepAlive extends TelemetryMessage {
 
 	//FIXME: Get actual byte-length of this message.
 	

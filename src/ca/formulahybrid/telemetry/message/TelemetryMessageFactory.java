@@ -16,18 +16,18 @@ import org.reflections.Reflections;
 
 import ca.formulahybrid.telemetry.exception.DataException;
 
-public class CMessageFactory {
+public class TelemetryMessageFactory {
 	
-	private static Map<Short, Constructor<? extends CMessage>> idMap = new HashMap<Short, Constructor<? extends CMessage>>();
+	private static Map<Short, Constructor<? extends TelemetryMessage>> idMap = new HashMap<Short, Constructor<? extends TelemetryMessage>>();
 	private static Map<Short, Integer> sizeMap = new HashMap<Short, Integer>();
 	
 	static {
 		
 		// Find all the classes extending CMessage.
 		Reflections reflections = new Reflections("ca.formulahybrid.telemetry.message");
-		Set<Class<? extends CMessage>> messageTypes = reflections.getSubTypesOf(CMessage.class);
+		Set<Class<? extends TelemetryMessage>> messageTypes = reflections.getSubTypesOf(TelemetryMessage.class);
 		
-		for(Class<? extends CMessage> type : messageTypes){
+		for(Class<? extends TelemetryMessage> type : messageTypes){
 			
 			// Read the message descriptor for each message.
 			MessageDescriptor md = type.getAnnotation(MessageDescriptor.class);
@@ -37,7 +37,7 @@ public class CMessageFactory {
 			// Get the constructor for this message.
 			try {
 				
-				Constructor<? extends CMessage> constructor = type.getConstructor(new Class[]{Date.class, byte[].class});
+				Constructor<? extends TelemetryMessage> constructor = type.getConstructor(new Class[]{Date.class, byte[].class});
 				putWithCheck(messageId, md.length(), constructor);
 				
 			} catch (SecurityException e) { // Only accessing public constructors.
@@ -50,7 +50,7 @@ public class CMessageFactory {
 		}
 	}
 	
-	private static void putWithCheck(short id, int length, Constructor<? extends CMessage> constructor) throws DataException {
+	private static void putWithCheck(short id, int length, Constructor<? extends TelemetryMessage> constructor) throws DataException {
 		
 		if(idMap.containsKey(idMap))
 			throw new DataException("Attempted to insert duplicate id [" + id + "] for " 
@@ -61,19 +61,19 @@ public class CMessageFactory {
 		
 	}
 	
-	public static CMessage parseMessage(byte[] b) throws IOException, DataException {
+	public static TelemetryMessage parseMessage(byte[] b) throws IOException, DataException {
 	
 		return buildMessage(new ByteArrayInputStream(b));
 	}
 	
-	public static CMessage buildMessage(InputStream is) throws IOException, DataException{
+	public static TelemetryMessage buildMessage(InputStream is) throws IOException, DataException{
 		
 		// Convert to a data stream.
 		DataInputStream dis = new DataInputStream(is);
 		
 		byte[] header = new byte[4];
 		
-		if(!header.equals(CMessage.protocolIdentifier))
+		if(!header.equals(TelemetryMessage.protocolIdentifier))
 			return null;
 		
 		// Read in the date.
@@ -83,13 +83,12 @@ public class CMessageFactory {
 		date.setTime(unixTime * 1000);
 		
 		int messageId = dis.readInt();
-		short messageOrigin = dis.readShort();
 		
 		// Build the message.
 		if(!idMap.containsKey(messageId))
 			throw new DataException("Unrecognized message id [" + messageId + "]");
 		
-		Constructor<? extends CMessage> messageConstructor = idMap.get(messageId);
+		Constructor<? extends TelemetryMessage> messageConstructor = idMap.get(messageId);
 		
 		// Get the payload for this message.
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();

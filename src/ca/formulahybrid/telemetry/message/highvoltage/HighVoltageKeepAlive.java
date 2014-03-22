@@ -3,7 +3,7 @@ package ca.formulahybrid.telemetry.message.highvoltage;
 import java.io.IOException;
 import java.util.Date;
 
-import ca.formulahybrid.telemetry.message.CMessage;
+import ca.formulahybrid.telemetry.message.TelemetryMessage;
 import ca.formulahybrid.telemetry.message.MessageDescriptor;
 import ca.formulahybrid.telemetry.message.MessageOrigin;
 
@@ -14,7 +14,7 @@ import ca.formulahybrid.telemetry.message.MessageOrigin;
 	origin = MessageOrigin.HIGHVOLTAGE,
 	length = 6
 )
-public class HighVoltageKeepAlive extends CMessage {
+public class HighVoltageKeepAlive extends TelemetryMessage {
 
 	private int batteryLevel;
 	private boolean dragWingEnabled;
