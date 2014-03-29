@@ -22,9 +22,9 @@ public class HighVoltageKeepAlive extends TelemetryMessage {
 	//FIXME: Find exact meaning of value.
 	private byte electricMotorStatus;
 	
-	public HighVoltageKeepAlive(Date timeStamp, int messageId, byte[] payload) throws IOException {
+	public HighVoltageKeepAlive(Date timeStamp, int sequenceNumber, int messageId, byte[] payload) throws IOException {
 		
-		super(timeStamp, messageId,  payload);
+		super(timeStamp, sequenceNumber, messageId,  payload);
 		
 		batteryLevel = payloadStream.readByte();
 		dragWingEnabled = payloadStream.readBoolean();

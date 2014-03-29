@@ -19,9 +19,9 @@ public class DashBoardGearShift extends TelemetryMessage {
 
 	private boolean shiftUp = false;
 	
-	public DashBoardGearShift(Date timeStamp, int messageId, byte[] payload) throws IOException {
+	public DashBoardGearShift(Date timeStamp, int sequenceNumber, int messageId, byte[] payload) throws IOException {
 		
-		super(timeStamp, messageId,  payload);
+		super(timeStamp, sequenceNumber, messageId,  payload);
 		
 		if(payloadStream.readBoolean())
 			shiftUp = true;

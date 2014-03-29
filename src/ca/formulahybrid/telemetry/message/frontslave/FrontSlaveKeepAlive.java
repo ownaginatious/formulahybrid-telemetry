@@ -25,9 +25,9 @@ public class FrontSlaveKeepAlive extends TelemetryMessage {
 	
 	byte checksum;
 	
-	public FrontSlaveKeepAlive(Date timeStamp, int messageId, byte[] payload) throws IOException {
+	public FrontSlaveKeepAlive(Date timeStamp, int sequenceNumber, int messageId, byte[] payload) throws IOException {
 		
-		super(timeStamp, messageId,  payload);
+		super(timeStamp, sequenceNumber, messageId,  payload);
 		
 		frontLeftWheelSpeed = payloadStream.readByte();
 		frontRightWheelSpeed = payloadStream.readByte();

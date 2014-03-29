@@ -15,9 +15,9 @@ import ca.formulahybrid.telemetry.message.MessageOrigin;
 )
 public class FrontSlaveBrakeOverTravel extends TelemetryMessage {
 
-	public FrontSlaveBrakeOverTravel(Date timeStamp, int messageId, byte[] payload) throws IOException {
+	public FrontSlaveBrakeOverTravel(Date timeStamp, int sequenceNumber, int messageId, byte[] payload) throws IOException {
 		
-		super(timeStamp, messageId,  payload);
+		super(timeStamp, sequenceNumber, messageId,  payload);
 	}
 
 }

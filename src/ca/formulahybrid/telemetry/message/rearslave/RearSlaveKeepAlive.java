@@ -25,9 +25,9 @@ public class RearSlaveKeepAlive extends TelemetryMessage {
 	private int backLeftWheelSpeed;
 	private int backRightWheelSpeed;
 	
-	public RearSlaveKeepAlive(Date timeStamp, int messageId, byte[] payload) throws IOException {
+	public RearSlaveKeepAlive(Date timeStamp, int sequenceNumber, int messageId, byte[] payload) throws IOException {
 		
-		super(timeStamp, messageId,  payload);
+		super(timeStamp, sequenceNumber, messageId,  payload);
 		
 		engineStatus = payloadStream.readShort();
 		

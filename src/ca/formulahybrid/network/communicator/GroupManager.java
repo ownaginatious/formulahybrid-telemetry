@@ -15,8 +15,6 @@ import ca.formulahybrid.network.groupcomm.Origin;
 import ca.formulahybrid.network.groupcomm.RelayBeacon;
 import ca.formulahybrid.network.groupcomm.State;
 import ca.formulahybrid.network.receiver.TelemetryReceiver;
-import ca.formulahybrid.network.receiver.TelemetryReceiverConnection;
-import ca.formulahybrid.telemetry.connector.TelemetryConnection;
 import ca.formulahybrid.telemetry.connector.TelemetrySource;
 
 public class GroupManager {
@@ -65,7 +63,7 @@ public class GroupManager {
     // ------------------
     
     protected Map<UUID, Beacon> neighbours = new HashMap<UUID, Beacon>();
-    protected Map<UUID, Integer> neighbourTimeouts = new HashMap<UUID, Integer>();
+    protected Map<UUID, Integer> neighbourTimeOuts = new HashMap<UUID, Integer>();
 
     // ------------------
 
@@ -75,10 +73,10 @@ public class GroupManager {
         float averageLoss = 0, bestPingTime = this.pingTime;
         
         // Increase the age of each neighbour's last communication.
-        for(UUID neighbour : this.neighbourTimeouts.keySet()){
+        for(UUID neighbour : this.neighbourTimeOuts.keySet()){
             
-            int age = this.neighbourTimeouts.get(neighbour) + 1;
-            this.neighbourTimeouts.put(neighbour, age);
+            int age = this.neighbourTimeOuts.get(neighbour) + 1;
+            this.neighbourTimeOuts.put(neighbour, age);
         }
         
         Beacon b;
@@ -91,14 +89,14 @@ public class GroupManager {
                 continue;
             
             this.neighbours.put(b.getIdentifier(), b);
-            this.neighbourTimeouts.put(b.getIdentifier(), 0); // Cancel out any timeout for this node.
+            this.neighbourTimeOuts.put(b.getIdentifier(), 0); // Cancel out any timeout for this node.
         }
         
         // Remove all beacons who have timed out.
-        for(UUID bId : this.neighbourTimeouts.keySet()){
+        for(UUID bId : this.neighbourTimeOuts.keySet()){
             
             // Remove any beacons that have disappeared for more than 3 beacon processing cycles (9 seconds).
-            if(this.neighbourTimeouts.get(bId) > 3)
+            if(this.neighbourTimeOuts.get(bId) > 3)
                 this.neighbours.remove(bId);
         }
         

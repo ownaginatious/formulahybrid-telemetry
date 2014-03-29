@@ -66,7 +66,7 @@ public class TelemetryMessageFactory {
 		return buildMessage(new ByteArrayInputStream(b));
 	}
 	
-	public static TelemetryMessage buildMessage(InputStream is) throws IOException, DataException{
+	public static TelemetryMessage buildMessage(InputStream is) throws IOException, DataException {
 		
 		// Convert to a data stream.
 		DataInputStream dis = new DataInputStream(is);
@@ -82,7 +82,9 @@ public class TelemetryMessageFactory {
 		Date date = new Date();
 		date.setTime(unixTime * 1000);
 		
-		int messageId = dis.readInt();
+		int sequenceNumber = dis.readInt();
+		int messageId = (int) dis.readShort();
+		int length = (int) dis.readShort();
 		
 		// Build the message.
 		if(!idMap.containsKey(messageId))
@@ -93,7 +95,13 @@ public class TelemetryMessageFactory {
 		// Get the payload for this message.
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		
-		int length = sizeMap.get(messageId);
+		int expectedLength = sizeMap.get(messageId);
+		
+		if(expectedLength != length)
+            throw new DataException("Length mismatch. Message identified as "
+                    + messageConstructor.getDeclaringClass().getName()
+                    + ", which expects a " + expectedLength
+                    + " byte payload. Received " + length);
 		
 		for(int i = 0; i < length; i++)
 			baos.write(dis.readByte());
@@ -101,7 +109,7 @@ public class TelemetryMessageFactory {
 		try {
 			
 			// Build a new instance of the message.
-			return messageConstructor.newInstance(date, messageId, is);
+			return messageConstructor.newInstance(date, sequenceNumber, messageId, is);
 			
 		} catch (IllegalArgumentException e) { // Impossible given already checked restrictions.
 		} catch (InstantiationException e) {

@@ -8,12 +8,14 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.util.UUID;
 
+import com.google.common.base.Charsets;
+
 import ca.formulahybrid.telemetry.exception.BeaconException;
 
 public abstract class Beacon {
 
 	// Identifier as "Listener Network Participation Beacon"
-	public static final byte[] protocolIdentifier = "LNPB".getBytes();
+	public static final byte[] protocolIdentifier = "LNPB".getBytes(Charsets.UTF_8);
 	
 	protected InetAddress origin;
 	protected UUID identifier;

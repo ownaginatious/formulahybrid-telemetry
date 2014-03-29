@@ -18,9 +18,9 @@ public class ThrottleControlKeepAlive extends TelemetryMessage {
 
 	boolean servoOpen;
 	
-	public ThrottleControlKeepAlive(Date timeStamp, int messageId, byte[] payload) throws IOException {
+	public ThrottleControlKeepAlive(Date timeStamp, int sequenceNumber, int messageId, byte[] payload) throws IOException {
 		
-		super(timeStamp, messageId,  payload);
+		super(timeStamp, sequenceNumber, messageId,  payload);
 		
 		servoOpen = payloadStream.readBoolean();
 	}

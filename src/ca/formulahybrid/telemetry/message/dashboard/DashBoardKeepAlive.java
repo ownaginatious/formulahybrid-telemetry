@@ -23,9 +23,9 @@ public class DashBoardKeepAlive extends TelemetryMessage {
 	private boolean throttleEnabled;
 	private boolean combustionEngineActive;
 	
-	public DashBoardKeepAlive(Date timeStamp, int messageId, byte[] payload) throws IOException {
+	public DashBoardKeepAlive(Date timeStamp, int sequenceNumber, int messageId, byte[] payload) throws IOException {
 		
-		super(timeStamp, messageId,  payload);
+		super(timeStamp, sequenceNumber, messageId,  payload);
 		
 		byte status = payloadStream.readByte();
 		
