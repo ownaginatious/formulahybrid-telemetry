@@ -1,22 +1,23 @@
 package ca.formulahybrid.telemetry.connector;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Set;
 
 import ca.formulahybrid.network.receiver.TelemetryReceiver;
+import ca.formulahybrid.network.telemetry.input.SourceTelemetryInput;
 import ca.formulahybrid.telemetry.exception.ConnectException;
-import ca.formulahybrid.telemetry.exception.DataException;
 import ca.formulahybrid.telemetry.exception.TelemetryException;
 import ca.formulahybrid.telemetry.message.TelemetryMessage;
 
 public class TelemetryConnection {
 
-    private static enum State { CONNECTED, DISCONNECTED };
-    
-    private State s;
     private TelemetryReceiver receiver;
+    
+    private SourceTelemetryInput sourceConnection;
     
 	/**
 	 * Scans all network interfaces for a specified amount of time for telemetry sources
@@ -63,8 +64,10 @@ public class TelemetryConnection {
 	 */
 	public void connect(TelemetrySource ts) throws ConnectException, TelemetryException, IOException {
 	    
-	    if(this.s == State.CONNECTED)
-	        throw new ConnectException("Must disconnect before connecting again.");
+	    if(this.sourceConnection != null)
+	        throw new ConnectException("Already connected to a source [" + this.sourceConnection.getSource() + "]");
+	    
+	    this.sourceConnection = new SourceTelemetryInput(ts, false);
 	}
 
 	/**
@@ -73,10 +76,10 @@ public class TelemetryConnection {
      * 
      * @throws ConnectException Thrown if no connection exists to be closed.
      */
-    public void disconnect() throws ConnectException{
+    public void disconnect() {
     	
-        if(this.s == State.DISCONNECTED)
-            throw new ConnectException("Must connect to a network before being able to disconnect.");
+        if(this.sourceConnection != null)
+            this.sourceConnection.disconnect();
     }
 
     public TelemetryMessage getMessage() throws ConnectException, IOException {
@@ -84,39 +87,52 @@ public class TelemetryConnection {
     	return this.receiver.getMessage();
     }
 
-    //#FIXME: Propagate timeouts.
-    public TelemetryMessage getMessage(long timeout) throws ConnectException {
-    	
-    	return null;
-    }
-
-    //#FIXME: Requires complete implementation.
+    //#TODO: Requires complete implementation.
     public TelemetryMessage sendMessage(TelemetryMessage cm) throws ConnectException {
     	
     	return null;
     }
 
-    public void connectToLocalReplay(File f) throws DataException, IOException {
+    public void connectToLocalReplay(File f, boolean simulated) throws IOException, TelemetryException {
 		
-        this.receiver.connectLocalFile(f, true);
+        this.receiver.connectLocalFile(f, simulated);
 	}
 
-	public void connectToLocalReplay(String path) throws DataException, IOException {
-		 
-		File f = new File(path);
-		this.connectToLocalReplay(f);
+	public void connectToLocalReplay(String path, boolean simulated) throws IOException, TelemetryException {
+	    
+		this.connectToLocalReplay(new File(path), simulated);
 	}
 
-	public Set<String> getRemoteReplays() throws ConnectException {
-		
-	    return null;
+	public Set<String> getRemoteReplays() throws ConnectException, IOException, TelemetryException {
+
+        if(this.sourceConnection != null)
+            throw new ConnectException("No source connection to perform the command on.");
+        
+        return this.sourceConnection.getLogs();
 	}
 
-	public void connectToRemoteReplay(String remoteReplayName) throws ConnectException, FileNotFoundException, DataException{
-		
+	public void connectToRemoteReplay(String remoteReplayName) throws ConnectException, FileNotFoundException {
+
+        if(this.sourceConnection != null)
+            throw new ConnectException("No source connection to perform the command on.");
+	    
 	}
 
-	public void storeRemoteReplay(String remoteReplayName, String path, boolean overwrite){
-		
+	public void storeRemoteReplay(String remoteReplayName, String path) throws ConnectException, IOException, TelemetryException{
+
+        if(this.sourceConnection != null)
+            throw new ConnectException("No source connection to perform the command on.");
+        
+        FileOutputStream fos = new FileOutputStream(new File(path));
+        
+        ByteArrayInputStream bais = new ByteArrayInputStream(this.sourceConnection.getRemoteLog(remoteReplayName));
+        
+        byte[] buffer = new byte[1024]; // Data buffer.
+        int bytesIncoming = 0;
+        
+        while((bytesIncoming = bais.read(buffer)) != 0)
+            fos.write(buffer, 0, bytesIncoming);
+        
+        fos.close();
 	}
 }

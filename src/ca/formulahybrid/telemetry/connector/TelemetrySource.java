@@ -39,4 +39,12 @@ public abstract class TelemetrySource {
 	    
 	    return this.name.hashCode();
 	}
+	
+	@Override
+	public String toString(){
+
+	    return new StringBuilder().append("[ TSOURCE ")
+	            .append(this.name).append(" @ ")
+	            .append(this.address).toString();
+	}
 }

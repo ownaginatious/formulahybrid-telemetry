@@ -2,7 +2,8 @@ package ca.formulahybrid.telemetry.exception;
 
 public class UnreachableException extends Exception {
 
-    private static final long serialVersionUID = 8803353375064793306L;
+    // We do not care about serializing this exception.
+    private static final long serialVersionUID = 1L;
 
     public UnreachableException(String message, Exception e){
 		

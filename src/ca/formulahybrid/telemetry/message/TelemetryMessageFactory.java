@@ -1,7 +1,6 @@
 package ca.formulahybrid.telemetry.message;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,33 +11,56 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.log4j.Logger;
 import org.reflections.Reflections;
 
+import com.google.common.base.Charsets;
+
 import ca.formulahybrid.telemetry.exception.DataException;
+import ca.formulahybrid.telemetry.message.control.AlienControlFlag;
+import ca.formulahybrid.telemetry.message.control.ControlFlag;
+import ca.formulahybrid.telemetry.message.vehicle.AlienVehicleMessage;
+import ca.formulahybrid.telemetry.message.vehicle.VehicleMessage;
 
 public class TelemetryMessageFactory {
-	
-	private static Map<Short, Constructor<? extends TelemetryMessage>> idMap = new HashMap<Short, Constructor<? extends TelemetryMessage>>();
-	private static Map<Short, Integer> sizeMap = new HashMap<Short, Integer>();
-	
+
+    private static Map<Short, Constructor<? extends VehicleMessage>> vehicleMessageMap = new HashMap<Short, Constructor<? extends VehicleMessage>>();
+    private static Map<Short, Integer> vehicleMessageSizeMap = new HashMap<Short, Integer>();
+
+    private static Map<Short, Constructor<? extends ControlFlag>> controlFlagMap = new HashMap<Short, Constructor<? extends ControlFlag>>();
+    private static Map<Short, Integer> controlFlagSizeMap = new HashMap<Short, Integer>();
+
+    private static Logger logger = Logger.getLogger(TelemetryMessageFactory.class);
+    
 	static {
 		
-		// Find all the classes extending CMessage.
-		Reflections reflections = new Reflections("ca.formulahybrid.telemetry.message");
-		Set<Class<? extends TelemetryMessage>> messageTypes = reflections.getSubTypesOf(TelemetryMessage.class);
+		// Find all the classes extending VehicleMessage.
+		Reflections reflections = new Reflections("ca.formulahybrid.telemetry.message.vehicle");
+		Set<Class<? extends VehicleMessage>> vehicleMessages = reflections.getSubTypesOf(VehicleMessage.class);
 		
-		for(Class<? extends TelemetryMessage> type : messageTypes){
+		for(Class<? extends VehicleMessage> type : vehicleMessages){
 			
+		    // Ignore the alien class.
+		    if(type.getClass().equals(AlienVehicleMessage.class))
+		        continue;
+		        
 			// Read the message descriptor for each message.
-			MessageDescriptor md = type.getAnnotation(MessageDescriptor.class);
+			VehicleMessageDescriptor vmd = type.getAnnotation(VehicleMessageDescriptor.class);
 				
-			short messageId = md.id();
+			short messageId = vmd.id();
 			
 			// Get the constructor for this message.
 			try {
 				
-				Constructor<? extends TelemetryMessage> constructor = type.getConstructor(new Class[]{Date.class, byte[].class});
-				putWithCheck(messageId, md.length(), constructor);
+			    Constructor<? extends VehicleMessage> constructor = type.getConstructor(new Class[]{Date.class, Integer.class, byte[].class});
+			    
+				if(vehicleMessageMap.containsKey(messageId))
+		            throw new DataException("Attempted to insert duplicate id [" + messageId + "] for " 
+		                        + constructor.getName() + ", which was already reserved for "
+		                        + vehicleMessageMap.get(messageId).getName() + ".");
+		        
+				vehicleMessageMap.put(messageId, constructor);
+				vehicleMessageSizeMap.put(messageId, vmd.length());
 				
 			} catch (SecurityException e) { // Only accessing public constructors.
 			} catch (NoSuchMethodException e) {} // Enforced by extension.
@@ -48,74 +70,165 @@ public class TelemetryMessageFactory {
 				System.exit(1);
 			}
 		}
+		
+	    // Find all the classes extending ControlFlag.
+        reflections = new Reflections("ca.formulahybrid.telemetry.message.control");
+        Set<Class<? extends ControlFlag>> controlFlags = reflections.getSubTypesOf(ControlFlag.class);
+        
+        for(Class<? extends ControlFlag> type : controlFlags){
+            
+            // Ignore the alien class.
+            if(type.getClass().equals(AlienControlFlag.class))
+                continue;
+            
+            // Read the message descriptor for each message.
+            ControlFlagDescriptor cfd = type.getAnnotation(ControlFlagDescriptor.class);
+                
+            short messageId = cfd.id();
+            
+            // Get the constructor for this message.
+            try {
+                
+                Constructor<? extends ControlFlag> constructor = type.getConstructor(new Class[]{Date.class, Integer.class, byte[].class});
+                
+                if(controlFlagMap.containsKey(messageId))
+                    throw new DataException("Attempted to insert duplicate id [" + messageId + "] for " 
+                                + constructor.getName() + ", which was already reserved for "
+                                + vehicleMessageMap.get(messageId).getName() + ".");
+                
+                controlFlagMap.put(messageId, constructor);
+                controlFlagSizeMap.put(messageId, cfd.length());
+                
+            } catch (SecurityException e) { // Only accessing public constructors.
+            } catch (NoSuchMethodException e) {} // Enforced by extension.
+            catch (DataException e) {
+                
+                e.printStackTrace();
+                System.exit(1);
+            }
+        }
 	}
 	
-	private static void putWithCheck(short id, int length, Constructor<? extends TelemetryMessage> constructor) throws DataException {
-		
-		if(idMap.containsKey(idMap))
-			throw new DataException("Attempted to insert duplicate id [" + id + "] for " 
-						+ constructor.getName() + ", which was already reserved for " + idMap.get(id).getName() + ".");
-		
-		idMap.put(id, constructor);
-		sizeMap.put(id, length);
-		
+	public static TelemetryMessage parseTelemetryMessage(byte[] b) throws IOException {
+	
+		return buildTelemetryMessage(new ByteArrayInputStream(b));
 	}
 	
-	public static TelemetryMessage parseMessage(byte[] b) throws IOException, DataException {
-	
-		return buildMessage(new ByteArrayInputStream(b));
-	}
-	
-	public static TelemetryMessage buildMessage(InputStream is) throws IOException, DataException {
+	public static TelemetryMessage buildTelemetryMessage(InputStream is) throws IOException {
 		
 		// Convert to a data stream.
 		DataInputStream dis = new DataInputStream(is);
 		
-		byte[] header = new byte[4];
+		byte[] header = new byte[3];
 		
-		if(!header.equals(TelemetryMessage.protocolIdentifier))
-			return null;
-		
-		// Read in the date.
-		int unixTime = dis.readInt();
-		
-		Date date = new Date();
-		date.setTime(unixTime * 1000);
-		
-		int sequenceNumber = dis.readInt();
-		int messageId = (int) dis.readShort();
-		int length = (int) dis.readShort();
-		
-		// Build the message.
-		if(!idMap.containsKey(messageId))
-			throw new DataException("Unrecognized message id [" + messageId + "]");
-		
-		Constructor<? extends TelemetryMessage> messageConstructor = idMap.get(messageId);
-		
-		// Get the payload for this message.
-		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		
-		int expectedLength = sizeMap.get(messageId);
-		
-		if(expectedLength != length)
-            throw new DataException("Length mismatch. Message identified as "
-                    + messageConstructor.getDeclaringClass().getName()
-                    + ", which expects a " + expectedLength
-                    + " byte payload. Received " + length);
-		
-		for(int i = 0; i < length; i++)
-			baos.write(dis.readByte());
-		
-		try {
-			
-			// Build a new instance of the message.
-			return messageConstructor.newInstance(date, sequenceNumber, messageId, is);
-			
-		} catch (IllegalArgumentException e) { // Impossible given already checked restrictions.
-		} catch (InstantiationException e) {
-		} catch (IllegalAccessException e) {
-		} catch (InvocationTargetException e) {}
-		
-		return null;
+		boolean isVehicleMessage = false;
+
+        // Check the headers to ensure this is a control flag or a vehicle message.
+		if(!header.equals(VehicleMessage.protocolHeader)) // Check if it is a vehicle message.
+			isVehicleMessage = true;
+		else if(!header.equals(ControlFlag.protocolHeader)) // Check if it is a control flag.
+		    isVehicleMessage = false;
+		else
+		    throw new IOException(new StringBuilder().append("Sync error. Expected either the protocol headers : ")
+		            .append(new String(VehicleMessage.protocolHeader, Charsets.UTF_8)).append(" or ")
+		            .append(new String(ControlFlag.protocolHeader, Charsets.UTF_8)).append(". Received ")
+		            .append(new String(header, Charsets.UTF_8)).append(".").toString());
+        
+		if(isVehicleMessage)
+		    return buildVehicleMessage(dis);
+		else
+		    return buildControlFlag(dis);
+	}
+	
+	private static ControlFlag buildControlFlag(DataInputStream dis) throws IOException{
+	    
+        // Read the message ID.
+        int messageId = (int) dis.readShort();
+        
+        int length = (int) dis.readShort();
+        
+        // Retrieve the payload.
+        byte[] payload = new byte[length];
+        dis.read(payload);
+        
+        // If we do not recognize the ID, return an alien message.
+        if(!vehicleMessageMap.containsKey(messageId))
+            return new AlienControlFlag(messageId, payload);
+        
+        Constructor<? extends ControlFlag> controlFlagConstructor = controlFlagMap.get(messageId);
+        
+        int expectedLength = controlFlagSizeMap.get(messageId);
+        
+        if(expectedLength != length){
+            
+            logger.debug("Message with recognized ID [" + messageId + "] ("
+                    + controlFlagConstructor.getName() + ") arrived of length "
+                    + length + ", however a length of " + expectedLength + " was expected. Returning alien.");
+            
+            return new AlienControlFlag(messageId, payload);
+        }
+        
+        try {
+            
+            // Build a new instance of the message.
+            return controlFlagConstructor.newInstance(dis);
+            
+        } catch (IllegalArgumentException e) { // Impossible given already checked restrictions.
+        } catch (InstantiationException e) {
+        } catch (IllegalAccessException e) {
+        } catch (InvocationTargetException e) {}
+        
+        return null;
+	}
+	
+	private static VehicleMessage buildVehicleMessage(DataInputStream dis) throws IOException {
+	    
+        // Read the message ID.
+        int messageId = (int) dis.readShort();
+        
+        // Read in the date.
+        int unixTime = dis.readInt();
+        
+        // Convert the date from UNIX time.
+        Date date = new Date();
+        date.setTime(unixTime * 1000);
+        
+        // Read the sequencing number of the message.
+        int sequenceNumber = dis.readInt();
+        int length = (int) dis.readShort();
+        
+        // Buffer the payload.
+        byte[] payload = new byte[length];
+        dis.read(payload);
+        
+        // If we do not recognize this message, generate an alien message.
+        if(!vehicleMessageMap.containsKey(messageId))
+            return new AlienVehicleMessage(date, messageId, sequenceNumber, payload);
+        
+        // Retrieve the constructor for this message.
+        Constructor<? extends VehicleMessage> vehicleMessageConstructor = vehicleMessageMap.get(messageId);
+        
+        int expectedLength = vehicleMessageSizeMap.get(messageId);
+        
+        if(expectedLength != length){
+            
+            logger.debug("Message with recognized ID [" + messageId + "] ("
+                    + vehicleMessageConstructor.getName() + ") arrived of length "
+                    + length + ", however a length of " + expectedLength + " was expected. Returning alien.");
+            
+            return new AlienVehicleMessage(date, messageId, sequenceNumber, payload);
+        }
+        
+        try {
+            
+            // Build a new instance of the message.
+            return vehicleMessageConstructor.newInstance(date, sequenceNumber, payload);
+            
+        } catch (IllegalArgumentException e) { // Impossible given already checked restrictions.
+        } catch (InstantiationException e) {
+        } catch (IllegalAccessException e) {
+        } catch (InvocationTargetException e) {}
+        
+        return null;
 	}
 }

@@ -9,5 +9,7 @@ public interface TelemetryOutput {
     public void sendBinary(byte[] message) throws IOException;
     public void sendMessage(TelemetryMessage message) throws IOException;
     
+    public boolean isConnected();
+    
     public void close();
 }

@@ -1,21 +1,19 @@
-package ca.formulahybrid.telemetry.message.frontslave;
+package ca.formulahybrid.telemetry.message.vehicle;
 
 import java.io.IOException;
 import java.util.Date;
 
 import ca.formulahybrid.telemetry.exception.DataValidityException;
-import ca.formulahybrid.telemetry.message.TelemetryMessage;
-import ca.formulahybrid.telemetry.message.MessageDescriptor;
-import ca.formulahybrid.telemetry.message.MessageOrigin;
+import ca.formulahybrid.telemetry.message.VehicleMessageDescriptor;
+import ca.formulahybrid.telemetry.message.VehicleMessageOrigin;
 
-//FIXME: Replace with actual message ID.
-@MessageDescriptor(
+@VehicleMessageDescriptor(
 		
-	id = 0000000000,
-	origin = MessageOrigin.FRONTSLAVE,
+	id = 0b00100001111,
+	origin = VehicleMessageOrigin.FRONTSLAVE,
 	length = 6
 )
-public class FrontSlaveKeepAlive extends TelemetryMessage {
+public class FrontSlaveVehicleMessage extends VehicleMessage {
 
 	private int frontLeftWheelSpeed;
 	private int frontRightWheelSpeed;
@@ -25,9 +23,9 @@ public class FrontSlaveKeepAlive extends TelemetryMessage {
 	
 	byte checksum;
 	
-	public FrontSlaveKeepAlive(Date timeStamp, int sequenceNumber, int messageId, byte[] payload) throws IOException {
+	public FrontSlaveVehicleMessage(Date timeStamp, int sequenceNumber,  byte[] payload) throws IOException {
 		
-		super(timeStamp, sequenceNumber, messageId,  payload);
+		super(timeStamp, sequenceNumber,  payload);
 		
 		frontLeftWheelSpeed = payloadStream.readByte();
 		frontRightWheelSpeed = payloadStream.readByte();

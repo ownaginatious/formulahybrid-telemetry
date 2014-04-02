@@ -1,11 +1,11 @@
 package ca.formulahybrid.telemetry.message;
 
-public enum MessageOrigin {
+public enum VehicleMessageOrigin {
 
 	FRONTSLAVE,
 	REARSLAVE,
 	DASHBOARD,
 	THROTTLECONTROL,
 	HIGHVOLTAGE,
-	UNSPECIFIED
+	UNKNOWN
 }

@@ -1,20 +1,18 @@
-package ca.formulahybrid.telemetry.message.rearslave;
+package ca.formulahybrid.telemetry.message.vehicle;
 
 import java.io.IOException;
 import java.util.Date;
 
-import ca.formulahybrid.telemetry.message.TelemetryMessage;
-import ca.formulahybrid.telemetry.message.MessageDescriptor;
-import ca.formulahybrid.telemetry.message.MessageOrigin;
+import ca.formulahybrid.telemetry.message.VehicleMessageDescriptor;
+import ca.formulahybrid.telemetry.message.VehicleMessageOrigin;
 
-//FIXME: Replace with actual message ID.
-@MessageDescriptor(
+@VehicleMessageDescriptor(
 		
-	id = 0000000000,
-	origin = MessageOrigin.REARSLAVE,
+	id = 0b01000000101,
+	origin = VehicleMessageOrigin.REARSLAVE,
 	length = 5
 )
-public class RearSlaveKeepAlive extends TelemetryMessage {
+public class RearSlaveVehicleMessage extends VehicleMessage {
 
 	//FIXME: Get actual byte-length of this message.
 	
@@ -25,9 +23,9 @@ public class RearSlaveKeepAlive extends TelemetryMessage {
 	private int backLeftWheelSpeed;
 	private int backRightWheelSpeed;
 	
-	public RearSlaveKeepAlive(Date timeStamp, int sequenceNumber, int messageId, byte[] payload) throws IOException {
+	public RearSlaveVehicleMessage(Date timeStamp, int sequenceNumber, byte[] payload) throws IOException {
 		
-		super(timeStamp, sequenceNumber, messageId,  payload);
+		super(timeStamp, sequenceNumber,  payload);
 		
 		engineStatus = payloadStream.readShort();
 		

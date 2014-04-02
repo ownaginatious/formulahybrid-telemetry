@@ -1,6 +1,7 @@
 package ca.formulahybrid.network.telemetry.input;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.util.Timer;
@@ -8,27 +9,60 @@ import java.util.TimerTask;
 
 import org.apache.log4j.Logger;
 
-import ca.formulahybrid.telemetry.exception.DataException;
+import com.google.common.base.Charsets;
+
+import ca.formulahybrid.network.receiver.TelemetryReceiver.ConnectionType;
+import ca.formulahybrid.network.telemetry.output.ReliableRelayTelemetryOutput;
+import ca.formulahybrid.telemetry.connector.TelemetrySource;
 import ca.formulahybrid.telemetry.exception.TelemetryException;
-import ca.formulahybrid.telemetry.exception.TelemetryTimeOutException;
 import ca.formulahybrid.telemetry.message.TelemetryMessage;
 import ca.formulahybrid.telemetry.message.TelemetryMessageFactory;
+import ca.formulahybrid.telemetry.message.control.ControlFlag;
+import ca.formulahybrid.telemetry.message.control.HeartBeatControlFlag;
+import ca.formulahybrid.telemetry.message.control.ShutDownControlFlag;
 
 public class ReliableRelayTelemetryInput implements TelemetryInput {
 
-    public static final byte heartBeatFlag = 'H';
+    private static final ConnectionType CONNECTION = ConnectionType.RELIABLERELAY;
     
     private Logger logger = Logger.getLogger(ReliableRelayTelemetryInput.class);
     
     private Socket s;
     private Timer heartBeat = new Timer();
     
-    public ReliableRelayTelemetryInput(InetAddress address, int port) throws IOException {
-        
-        if(this.s != null)
-            return;
+    public ReliableRelayTelemetryInput(InetAddress address, int port, TelemetrySource desiredSource) throws IOException, TelemetryException {
         
         this.s = new Socket(address, port);
+        this.s.setSoTimeout(5000); // We will drop a server connection after 5 seconds of silence.
+
+        InputStream is = this.s.getInputStream();
+
+        // *****************************
+        // Start identifying the server.
+        // *****************************
+        
+        byte[] protocolHeader = ReliableRelayTelemetryOutput.protocolIdentifier;
+        
+        // Ensure that this is a relay.
+        byte[] header = new byte[protocolHeader.length];
+        
+        is.read(header);
+        
+        if(!header.equals(protocolHeader))
+            throw new IOException("Expected protocol header '"
+                    + new String(protocolHeader, Charsets.UTF_8)
+                    + "'. Received " + new String(header, Charsets.UTF_8) + " instead.");
+        
+        byte[] nameBuffer = new byte[is.read()];
+        is.read(nameBuffer);
+        
+        String name = new String(nameBuffer, Charsets.UTF_8);
+        
+        if(!name.equals(desiredSource.getName()))
+            throw new TelemetryException("The connected node identified as a telemetry source, but is relaying for " 
+                    + name + ", not the expected " + desiredSource.getName());
+
+        // ****************************
         
         // Begin sending heart beats at an interval of 3 seconds until the connection dies.
         this.heartBeat.schedule(new TimerTask(){
@@ -42,8 +76,11 @@ public class ReliableRelayTelemetryInput implements TelemetryInput {
                     
                     if(s == null)
                         throw new IOException();
-                    else
-                       s.getOutputStream().write(ReliableRelayTelemetryInput.heartBeatFlag);
+                    else {
+                        
+                       s.getOutputStream().write(new HeartBeatControlFlag().getBytes());
+                       s.getOutputStream().flush();
+                    }
                    
                 } catch (IOException e) {
                     
@@ -70,11 +107,40 @@ public class ReliableRelayTelemetryInput implements TelemetryInput {
     }
 
     @Override
-    public boolean connected() {
+    public boolean isConnected() {
         
         return this.s != null;
     }
     
+    @Override
+    public TelemetryMessage getMessage() throws IOException, ControlFlag {
+        
+        while(true){
+            
+            TelemetryMessage tm = TelemetryMessageFactory.buildTelemetryMessage(this.s.getInputStream());
+            
+            // Check if this message is a control flag.
+            if(tm instanceof ControlFlag){
+    
+                if(tm instanceof ShutDownControlFlag){
+                
+                    try {
+                        this.s.close();
+                    } catch(IOException ioe){}
+                    
+                    throw ((ShutDownControlFlag) tm);
+                }
+                // Used to differentiate slow telemetry and source failure.
+                else if(tm instanceof HeartBeatControlFlag)
+                    continue;
+                else
+                    throw (ControlFlag) tm;
+            }
+            
+            return tm;
+        }
+    }
+
     @Override
     public String toString(){
         
@@ -84,28 +150,10 @@ public class ReliableRelayTelemetryInput implements TelemetryInput {
                 .append(s.getInetAddress()).append(":")
                 .append(s.getPort()).toString();
     }
-    
-    //#TODO: Add support for telemetry pseudo message flags (close, heart beat)
-    @Override
-    public TelemetryMessage getMessage() throws IOException {
-        
-        TelemetryMessage tm = null;
-        
-        try {
-            
-            tm = TelemetryMessageFactory.buildMessage(this.s.getInputStream());
-            
-        } catch (DataException e) {
-            
-            logger.debug("Dropping message : " + e.getMessage());
-        }
-        
-        return tm;
-    }
 
     @Override
-    public TelemetryMessage getMessage(long timeout) throws IOException, TelemetryException, TelemetryTimeOutException {
+    public ConnectionType getConnectionType() {
         
-        return null;
+        return ReliableRelayTelemetryInput.CONNECTION;
     }
 }

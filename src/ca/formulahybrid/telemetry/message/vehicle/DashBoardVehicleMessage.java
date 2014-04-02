@@ -1,20 +1,19 @@
-package ca.formulahybrid.telemetry.message.dashboard;
+package ca.formulahybrid.telemetry.message.vehicle;
 
 import java.io.IOException;
 import java.util.Date;
 
-import ca.formulahybrid.telemetry.message.TelemetryMessage;
-import ca.formulahybrid.telemetry.message.MessageDescriptor;
-import ca.formulahybrid.telemetry.message.MessageOrigin;
+import ca.formulahybrid.telemetry.message.VehicleMessageDescriptor;
+import ca.formulahybrid.telemetry.message.VehicleMessageOrigin;
 
 //FIXME: Replace with actual message ID.
-@MessageDescriptor(
+@VehicleMessageDescriptor(
 		
 	id = 0000000000,
-	origin = MessageOrigin.DASHBOARD,
+	origin = VehicleMessageOrigin.DASHBOARD,
 	length = 1
 )
-public class DashBoardKeepAlive extends TelemetryMessage {
+public class DashBoardVehicleMessage extends VehicleMessage {
 
 	private boolean declutchInitialized;
 	private boolean dragReduceEnabled;
@@ -23,9 +22,9 @@ public class DashBoardKeepAlive extends TelemetryMessage {
 	private boolean throttleEnabled;
 	private boolean combustionEngineActive;
 	
-	public DashBoardKeepAlive(Date timeStamp, int sequenceNumber, int messageId, byte[] payload) throws IOException {
+	public DashBoardVehicleMessage(Date timeStamp, int sequenceNumber, byte[] payload) throws IOException {
 		
-		super(timeStamp, sequenceNumber, messageId,  payload);
+		super(timeStamp, sequenceNumber,  payload);
 		
 		byte status = payloadStream.readByte();
 		

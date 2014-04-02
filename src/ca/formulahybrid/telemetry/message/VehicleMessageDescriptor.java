@@ -9,9 +9,9 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-public @interface MessageDescriptor {
+public @interface VehicleMessageDescriptor {
 
 	short id();
 	int length();
-	MessageOrigin origin();
+	VehicleMessageOrigin origin();
 }
