@@ -16,7 +16,7 @@ import ca.formulahybrid.telemetry.message.vehicle.VehicleMessage;
 public class LocalFileTelemetryOutput implements TelemetryOutput {
 
     // TTR = Telemetry Transmission Record.
-    public static final byte[] protocolHeader = "TTR".getBytes(Charsets.UTF_8);
+    public static final byte[] PROTOCOL_HEADER = "TTR".getBytes(Charsets.UTF_8);
     
     private Logger logger = Logger.getLogger(LocalFileTelemetryOutput.class);
     
@@ -31,7 +31,7 @@ public class LocalFileTelemetryOutput implements TelemetryOutput {
         this.path = f.getName();
         
         // Write the header.
-        this.fos.write(LocalFileTelemetryOutput.protocolHeader);
+        this.fos.write(LocalFileTelemetryOutput.PROTOCOL_HEADER);
     }
 
     @Override

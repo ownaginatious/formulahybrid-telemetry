@@ -14,7 +14,7 @@ import ca.formulahybrid.telemetry.message.TelemetryMessage;
 public abstract class ControlFlag extends Exception implements TelemetryMessage {
     
     // Identifier for "Telemetry Control Flag"
-    public static byte[] protocolHeader = "TCF".getBytes(Charsets.UTF_8);
+    public static byte[] PROTOCOL_HEADER = "TCF".getBytes(Charsets.UTF_8);
     
     // We do not care about serialization.
     private static final long serialVersionUID = 1L;
@@ -41,16 +41,16 @@ public abstract class ControlFlag extends Exception implements TelemetryMessage 
         DataOutputStream dos = new DataOutputStream(baos);
         
         // Get the message header.
-        ControlFlagDescriptor md = this.getClass().getAnnotation(ControlFlagDescriptor.class);
+        ControlFlagDescriptor cfd = this.getClass().getAnnotation(ControlFlagDescriptor.class);
         
         try {
             
-            dos.write(ControlFlag.protocolHeader);
+            dos.write(ControlFlag.PROTOCOL_HEADER);
             
             if(this instanceof AlienControlFlag)
-                dos.writeShort(((AlienControlFlag) this).getId());
+                dos.writeByte(((AlienControlFlag) this).getId());
             else
-                dos.writeShort(md.id());
+                dos.writeByte(cfd.id());
 
             if(this.rawPayload == null){
                 

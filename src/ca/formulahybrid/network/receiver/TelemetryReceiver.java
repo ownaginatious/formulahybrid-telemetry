@@ -23,10 +23,11 @@ import ca.formulahybrid.telemetry.exception.TelemetryException;
 import ca.formulahybrid.telemetry.message.TelemetryMessage;
 import ca.formulahybrid.telemetry.message.control.ConnectionThrownControlFlag;
 import ca.formulahybrid.telemetry.message.control.HeartBeatControlFlag;
+import ca.formulahybrid.telemetry.message.control.ProtocolFailureControlFlag;
 import ca.formulahybrid.telemetry.message.control.ShutDownControlFlag;
 import ca.formulahybrid.telemetry.message.control.ConnectionDropControlFlag;
 import ca.formulahybrid.telemetry.message.control.ControlFlag;
-import ca.formulahybrid.telemetry.message.control.StreamStoppedControlFlag;
+import ca.formulahybrid.telemetry.message.control.StreamStopControlFlag;
 
 public class TelemetryReceiver {
     
@@ -155,6 +156,12 @@ public class TelemetryReceiver {
                 & this.failureReason instanceof ConnectionDropControlFlag;
     }
     
+    public boolean protocolFailedAtSource(){
+        
+        return this.failureReason != null
+                & this.failureReason instanceof ProtocolFailureControlFlag;
+    }
+    
     public boolean sourceTimedOut(){
         
         return this.failureReason == null;
@@ -163,7 +170,7 @@ public class TelemetryReceiver {
     public boolean inputEnded(){
         
         return this.failureReason == null
-                | this.failureReason instanceof StreamStoppedControlFlag;
+                | this.failureReason instanceof StreamStopControlFlag;
     }
     
     public boolean connected(){

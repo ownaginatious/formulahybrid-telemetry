@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Set;
+import java.util.UUID;
 
 import ca.formulahybrid.network.receiver.TelemetryReceiver;
 import ca.formulahybrid.network.telemetry.input.SourceTelemetryInput;
@@ -16,6 +17,7 @@ import ca.formulahybrid.telemetry.message.TelemetryMessage;
 public class TelemetryConnection {
 
     private TelemetryReceiver receiver;
+    private UUID id = UUID.randomUUID(); // Generate a UUID for the node on start.
     
     private SourceTelemetryInput sourceConnection;
     
@@ -67,7 +69,7 @@ public class TelemetryConnection {
 	    if(this.sourceConnection != null)
 	        throw new ConnectException("Already connected to a source [" + this.sourceConnection.getSource() + "]");
 	    
-	    this.sourceConnection = new SourceTelemetryInput(ts, false);
+	    this.sourceConnection = new SourceTelemetryInput(id, ts);
 	}
 
 	/**

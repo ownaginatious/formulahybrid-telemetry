@@ -41,7 +41,7 @@ public class ReliableRelayTelemetryInput implements TelemetryInput {
         // Start identifying the server.
         // *****************************
         
-        byte[] protocolHeader = ReliableRelayTelemetryOutput.protocolIdentifier;
+        byte[] protocolHeader = ReliableRelayTelemetryOutput.PROTOCOL_HEADER;
         
         // Ensure that this is a relay.
         byte[] header = new byte[protocolHeader.length];
@@ -64,7 +64,7 @@ public class ReliableRelayTelemetryInput implements TelemetryInput {
 
         // ****************************
         
-        // Begin sending heart beats at an interval of 3 seconds until the connection dies.
+        // Begin sending heart beats at an interval of 1 seconds until the connection dies.
         this.heartBeat.schedule(new TimerTask(){
 
             @Override
@@ -88,7 +88,18 @@ public class ReliableRelayTelemetryInput implements TelemetryInput {
                     ReliableRelayTelemetryInput.this.heartBeat.cancel();
                 }
                 
-            }}, 0, 3000);
+            }}, 0, 1000);
+        
+        // Wait up to 10 seconds for the initialization heart beat. This is to offset that we
+        // may be connecting up to 5 seconds before the next heart beat cycle on the host, giving
+        // very little time for the next heart beat to arrive before time out on the client.
+        this.s.setSoTimeout(10000);
+        
+        if(!(TelemetryMessageFactory.buildTelemetryMessage(is) instanceof HeartBeatControlFlag))
+            throw new IOException("Expected heart beat from the relay; received a "
+                    + "different control message. Check the implementation.");
+        
+        this.s.setSoTimeout(5000); // We will drop a server connection after 5 seconds of silence from now on.
     }
 
     @Override

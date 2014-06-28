@@ -126,12 +126,12 @@ public class TelemetryMessageFactory {
         // Check the headers to ensure this is a control flag or a vehicle message.
 		if(!header.equals(VehicleMessage.protocolHeader)) // Check if it is a vehicle message.
 			isVehicleMessage = true;
-		else if(!header.equals(ControlFlag.protocolHeader)) // Check if it is a control flag.
+		else if(!header.equals(ControlFlag.PROTOCOL_HEADER)) // Check if it is a control flag.
 		    isVehicleMessage = false;
 		else
 		    throw new IOException(new StringBuilder().append("Sync error. Expected either the protocol headers : ")
 		            .append(new String(VehicleMessage.protocolHeader, Charsets.UTF_8)).append(" or ")
-		            .append(new String(ControlFlag.protocolHeader, Charsets.UTF_8)).append(". Received ")
+		            .append(new String(ControlFlag.PROTOCOL_HEADER, Charsets.UTF_8)).append(". Received ")
 		            .append(new String(header, Charsets.UTF_8)).append(".").toString());
         
 		if(isVehicleMessage)

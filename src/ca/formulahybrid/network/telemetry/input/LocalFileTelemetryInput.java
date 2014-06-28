@@ -36,7 +36,7 @@ public class LocalFileTelemetryInput implements TelemetryInput {
         byte[] header = new byte[3];
         this.fs.read(header);
         
-        if(!header.equals(LocalFileTelemetryOutput.protocolHeader))
+        if(!header.equals(LocalFileTelemetryOutput.PROTOCOL_HEADER))
             throw new TelemetryException("This file is not a telemetry broadcast record.");
         
         // Get the time that this log starts.

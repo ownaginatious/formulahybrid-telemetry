@@ -9,9 +9,11 @@ import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.log4j.Logger;
 
@@ -27,12 +29,14 @@ import ca.formulahybrid.telemetry.message.control.HeartBeatControlFlag;
 public class ReliableRelayTelemetryOutput implements TelemetryOutput {
 
     // Identifier as "CAN Telemetry Network Relay".
-    public static final byte[] protocolIdentifier = "CTNR".getBytes(Charsets.UTF_8);
+    public static final byte[] PROTOCOL_HEADER = "CTNR".getBytes(Charsets.UTF_8);
 
     private static Logger logger = Logger.getLogger(ReliableRelayTelemetryOutput.class);
 
     private Set<Socket> connections = new HashSet<Socket>();
 
+    private Queue<Socket> socketsToAdd = new ConcurrentLinkedQueue<Socket>();
+    
     private int relayPort;
     private ServerSocket ss;
     
@@ -69,14 +73,14 @@ public class ReliableRelayTelemetryOutput implements TelemetryOutput {
                 reliableConnectionSweepRoutine();
             }}, 0, 5000);
         
-        // Sending heart beats at an interval of 3 seconds to all clients until the connection dies.
+        // Sending heart beats at an interval of 1 second to all clients until the connection dies.
         // This is to maintain the connection at times of general radio silence.
         this.heartBeat.schedule(new TimerTask(){
 
             @Override
             public void run() {
                 ReliableRelayTelemetryOutput.this.sendMessage(new HeartBeatControlFlag());
-            }}, 0, 3000);
+            }}, 0, 1000);
     }
 
     /**
@@ -128,9 +132,9 @@ public class ReliableRelayTelemetryOutput implements TelemetryOutput {
             }
         }
     
-        // Remove the dead connections.
         synchronized(this.connections){
-    
+
+            // Remove the dead connections.
             for(Socket s : deadDestinations){
     
                 this.connections.remove(s);
@@ -148,6 +152,23 @@ public class ReliableRelayTelemetryOutput implements TelemetryOutput {
                 logger.debug("Reliable connection to " + s.getInetAddress().toString()
                         + " has timed out and was dropped.");
             }
+            
+            // Add new connections.
+            while(!this.socketsToAdd.isEmpty()){
+                
+                // Send the "hello" heart beat.
+                Socket s = this.socketsToAdd.poll();
+                
+                try {
+                    
+                    s.getOutputStream().write(new HeartBeatControlFlag().getBytes());
+                    this.connections.add(s);
+                    
+                } catch (IOException e) {
+                    logger.debug("Failed to send initializing heart beat to "
+                            + s.getInetAddress().toString() + ". Dropped.");
+                }
+            }
         }
     
         logger.debug("Sweep completed.");
@@ -164,11 +185,14 @@ public class ReliableRelayTelemetryOutput implements TelemetryOutput {
                 logger.debug("Accepting new client [" + s.getInetAddress() + "] on to reliable connection.");
                 
                 try {
+                    
+                    // The longest we are willing to wait for this connection to setup is 1 second.
+                    s.setSoTimeout(1000);
     
                     DataOutputStream dos = new DataOutputStream(s.getOutputStream());
                     
                     // State information to the new socket.
-                    dos.write(ReliableRelayTelemetryOutput.protocolIdentifier);
+                    dos.write(ReliableRelayTelemetryOutput.PROTOCOL_HEADER);
                     
                     byte[] sourceName = this.sourceBeingRelayed.getName().getBytes(Charsets.UTF_8);
                     
@@ -178,10 +202,8 @@ public class ReliableRelayTelemetryOutput implements TelemetryOutput {
                     // We only want checking for incoming heart beats to be as non-blocking as possible.
                     s.setSoTimeout(1);
                     
-                    // Add the socket to the list of connections between a sweep or message push.
-                   synchronized(this.connections){
-                       this.connections.add(s);
-                   }
+                    // Add the socket to the queue on the next sweep.
+                    this.socketsToAdd.add(s);
                     
                 } catch (IOException e){
     

@@ -27,24 +27,24 @@ import ca.formulahybrid.telemetry.message.control.ShutDownControlFlag;
 import ca.formulahybrid.telemetry.message.control.ConnectionThrownControlFlag;
 import ca.formulahybrid.telemetry.message.control.ControlFlag;
 import ca.formulahybrid.telemetry.message.control.HeartBeatControlFlag;
-import ca.formulahybrid.telemetry.message.control.StreamStoppedControlFlag;
+import ca.formulahybrid.telemetry.message.control.StreamStopControlFlag;
 
 public class SourceTelemetryInput implements TelemetryInput {
 
     //#FIXME: Think of actual source port name.
-    private static final int TELEMETRY_SOURCE_PORT = 8888;
+    private static final int PROTOCOL_STANDARD_PORT = 8888;
     
     private static final ConnectionType CONNECTION = ConnectionType.SOURCE;
     
     // Identifier as "CAN Telemetry Source Device".
-    public static final byte[] protocolIdentifier = "CTSD".getBytes(Charsets.UTF_8);
+    public static final byte[] PROTOCOL_HEADER = "CTSD".getBytes(Charsets.UTF_8);
     
     private static enum State { STANDBY, RECEIVING };
     private static enum Command { GETOTHERS, STARTFEED, STOPFEED, DISCONNECT,
                                   GETLOGS, RETRIEVELOG, RETRIEVELOGFEED
                                 }
     
-    private static enum Response { NOSUCHLOG, INCOMINGLOG }
+    private static enum Response { IDINUSE, NOSUCHLOG, INCOMINGLOG, OK, NOSUCHCLIENT}
     
     private State state = State.STANDBY;
     private Socket s;
@@ -59,13 +59,13 @@ public class SourceTelemetryInput implements TelemetryInput {
     
     private int lastTimeout;
     
-    public SourceTelemetryInput(TelemetrySource ts, boolean throwable) throws IOException, TelemetryException {
+    public SourceTelemetryInput(UUID id, TelemetrySource ts) throws IOException, TelemetryException {
         
         this.source = ts;
         
         // Connect to the telemetry source.
         this.s = new Socket();
-        this.s.connect(new InetSocketAddress(ts.getSourceAddress(), TELEMETRY_SOURCE_PORT), 5000); // Start a new socket with a 5 second time.
+        this.s.connect(new InetSocketAddress(ts.getSourceAddress(), PROTOCOL_STANDARD_PORT), 5000); // Start a new socket with a 5 second time.
         
         this.dis = new DataInputStream(s.getInputStream());
         this.dos = new DataOutputStream(s.getOutputStream());
@@ -74,7 +74,7 @@ public class SourceTelemetryInput implements TelemetryInput {
         // Start identifying the server.
         // *****************************
         
-        byte[] protocolHeader = SourceTelemetryInput.protocolIdentifier;
+        byte[] protocolHeader = SourceTelemetryInput.PROTOCOL_HEADER;
         
         // Ensure that this is a source.
         byte[] header = new byte[protocolHeader.length];
@@ -86,7 +86,7 @@ public class SourceTelemetryInput implements TelemetryInput {
                     + new String(protocolHeader, Charsets.UTF_8)
                     + "'. Received " + new String(header, Charsets.UTF_8) + " instead.");
         
-        byte[] nameBuffer = new byte[this.dis.read()];
+        byte[] nameBuffer = new byte[((int) this.dis.read()) & 255];
         dis.read(nameBuffer);
         
         String name = new String(nameBuffer, Charsets.UTF_8);
@@ -94,8 +94,24 @@ public class SourceTelemetryInput implements TelemetryInput {
         if(!name.equals(this.source.getName()))
             throw new TelemetryException("The connected node identified as a telemetry source, but is relaying for " 
                     + name + ", not the expected " + this.source.getName());
-
+        
         // ****************************
+
+        dos.writeLong(id.getMostSignificantBits());
+        dos.writeLong(id.getLeastSignificantBits());
+        
+        // Read back the response.
+        byte resp = dis.readByte();
+        
+        if(resp != Response.OK.ordinal()){
+            
+            s.close();
+            
+            if(resp == Response.IDINUSE.ordinal())
+                throw new TelemetryException("The source reports that this ID is already in use by a different client.");
+            else
+                throw new TelemetryException("The source gave an unexpected response code: " + resp);
+        }
         
         // Set the timeout to 9 seconds to detect if we have been dropped..
         this.s.setSoTimeout(9000);
@@ -143,12 +159,12 @@ public class SourceTelemetryInput implements TelemetryInput {
         
         Set<String> logs = new HashSet<String>();
         
-        int logNum = this.dis.readByte();
+        int logNum = ((int) this.dis.readByte()) & 255; // Get the unsigned byte value.
         
         for(int i = 0; i < logNum; i++){
         
-            byte length = this.dis.readByte();
-            byte[] buffer = new byte[length];
+            // Create a buffer with the length of the incoming log.
+            byte[] buffer = new byte[((int) this.dis.readByte()) & 255];
             
             this.dis.read(buffer);
             logs.add(new String(buffer, Charsets.UTF_8));
@@ -224,19 +240,33 @@ public class SourceTelemetryInput implements TelemetryInput {
         return this.source;
     }
     
-    public void startFeed() throws TelemetryException, IOException {
+    public void startFeed(boolean throwable) throws TelemetryException, IOException {
         
         checkNotReceiving();
         
         attemptCommand(Command.STARTFEED, true);
-        this.state = State.RECEIVING;
         
+        // Tell the server whether or not this node is part of a group.
+        dos.writeBoolean(throwable);
+        
+        // Wait up to 10 seconds for the initialization heart beat. This is to offset that we
+        // may be connecting up to 5 seconds before the next heart beat cycle on the host, giving
+        // very little time for the next heart beat to arrive before time out on the client.
+        this.s.setSoTimeout(10000);
+        
+        if(!(TelemetryMessageFactory.buildTelemetryMessage(this.dis) instanceof HeartBeatControlFlag))
+            throw new IOException("Expected heart beat from the server; received a "
+                    + "different control message. Check the implementation.");
+
+        this.state = State.RECEIVING;
         this.startHeartBeat();
+        
+        this.s.setSoTimeout(5000); // We will drop a server connection after 5 seconds of silence from now on.
     }
     
     private void startHeartBeat() throws SocketException {
         
-        // Begin sending heart beats at an interval of 3 seconds until the feed is stopped.
+        // Begin sending heart beats at an interval of 1 second until the feed is stopped.
         this.heartBeat.schedule(new TimerTask(){
 
             @Override
@@ -266,11 +296,11 @@ public class SourceTelemetryInput implements TelemetryInput {
                     SourceTelemetryInput.this.heartBeat.cancel();
                 }
                 
-            }}, 0, 3000);
+            }}, 0, 1000);
         
-        // Set a timeout of three seconds to detect if we been disconnected while receiving.
+        // Set a timeout of five seconds to detect if we been disconnected while receiving.
         this.lastTimeout = this.s.getSoTimeout();
-        this.s.setSoTimeout(3000);
+        this.s.setSoTimeout(5000);
     }
     
     public void stopFeed() throws TelemetryException, IOException {
@@ -291,7 +321,7 @@ public class SourceTelemetryInput implements TelemetryInput {
         
         // Throw a stream stopped control flag to indicate nothing is streaming.
         if(this.state == State.STANDBY)
-            throw new StreamStoppedControlFlag();
+            throw new StreamStopControlFlag();
         
         TelemetryMessage tm = null;
         
@@ -311,12 +341,12 @@ public class SourceTelemetryInput implements TelemetryInput {
                     throw ((ShutDownControlFlag) tm);
                 }
                 
-                else if(tm instanceof StreamStoppedControlFlag){
+                else if(tm instanceof StreamStopControlFlag){
                     
                     this.state = State.STANDBY;
                     this.s.setSoTimeout(this.lastTimeout);
 
-                    throw ((StreamStoppedControlFlag) tm);
+                    throw ((StreamStopControlFlag) tm);
                 }
                     
                 else if(tm instanceof ConnectionThrownControlFlag){
